@@ -5,6 +5,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.test
+    command: pytest tests/ -v --cov=app --cov-report=term-missing
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -19,8 +20,12 @@ services:
       - CURRENT_PRICE_CACHE_TTL=300
       - TESTING=true
     depends_on:
-      - test-db
-      - test-redis
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+      test-migration:
+        condition: service_completed_successfully
 
   test-db:
     image: postgres:13
@@ -29,19 +34,48 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=bitcoin_prices_test
     ports:
-      - "5434:5432"  # Changed from 5433 to 5434
+      - "5434:5432"
+    volumes:
+      - test-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   test-redis:
     image: redis:6
     ports:
-      - "6381:6379"  # Changed from 6380 to 6381
+      - "6381:6379"
+    volumes:
+      - test-redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 5 
+      retries: 5
+      start_period: 10s
+
+  test-migration:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.test
+    command: alembic upgrade head
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=bitcoin_prices_test
+      - POSTGRES_HOST=test-db
+      - POSTGRES_PORT=5432
+    depends_on:
+      test-db:
+        condition: service_healthy
+
+volumes:
+  test-db-data:
+  test-redis-data: 
