@@ -5,6 +5,17 @@ from app.core.exceptions import CoinGeckoRateLimitError, CoinGeckoNetworkError, 
 from datetime import datetime, timezone
 from app.schemas.bitcoin import BitcoinPriceBase
 from app.models.bitcoin import BitcoinPrice
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.session import AsyncSessionLocal
+from sqlalchemy import text
+
+@pytest.fixture
+async def db_session():
+    async with AsyncSessionLocal() as session:
+        yield session
+        # Cleanup
+        await session.execute(text("DELETE FROM bitcoin_prices"))
+        await session.commit()
 
 @pytest.mark.asyncio
 async def test_get_current_price_success():

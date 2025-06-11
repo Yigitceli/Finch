@@ -3,6 +3,9 @@ from typing import Any, Callable, Optional, TypeVar, cast
 import hashlib
 import json
 from app.core.redis import redis_client
+from app.core.logging import setup_logging
+
+logger = setup_logging("cache")
 
 T = TypeVar('T')
 
@@ -35,14 +38,29 @@ def generate_cache_key(func: Callable, exclude_args: Optional[list[str]] = None,
 async def get_cache(key: str) -> Optional[str]:
     """Get value from cache."""
     if not redis_client.is_healthy():
+        logger.warning("Redis client is not healthy, skipping cache get operation")
         return None
-    return redis_client.get(key)
+    try:
+        value = redis_client.get(key)
+        if value is not None:
+            logger.debug(f"Cache hit for key: {key}")
+        else:
+            logger.debug(f"Cache miss for key: {key}")
+        return value
+    except Exception as e:
+        logger.error(f"Error getting value from cache for key {key}: {str(e)}")
+        return None
 
 async def set_cache(key: str, value: str, ttl: Optional[int] = None) -> None:
     """Set value in cache with optional TTL."""
     if not redis_client.is_healthy():
+        logger.warning("Redis client is not healthy, skipping cache set operation")
         return
-    redis_client.set(key, value, ttl)
+    try:
+        redis_client.set(key, value, ttl)
+        logger.debug(f"Successfully set cache for key: {key} with TTL: {ttl}")
+    except Exception as e:
+        logger.error(f"Error setting value in cache for key {key}: {str(e)}")
 
 def cache(
     ttl: Optional[int] = 3600,  # Default 1 hour
@@ -62,6 +80,7 @@ def cache(
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             # Skip caching if Redis is not healthy
             if not redis_client.is_healthy():
+                logger.warning(f"Redis client is not healthy, skipping cache for function: {func.__name__}")
                 return await func(*args, **kwargs)
             
             # Generate cache key
@@ -72,16 +91,20 @@ def cache(
             # Try to get from cache
             cached_result = redis_client.get(cache_key)
             if cached_result is not None:
-                print(f"Data retrieved from cache for key: {cache_key}")
+                logger.debug(f"Cache hit for function {func.__name__} with key: {cache_key}")
                 return cast(T, cached_result)
             else:
-                print(f"No data found in cache for key: {cache_key}")
+                logger.debug(f"Cache miss for function {func.__name__} with key: {cache_key}")
             
             # Execute function and cache result
-            result = await func(*args, **kwargs)
-            redis_client.set(cache_key, result, ttl)
-            
-            return result
+            try:
+                result = await func(*args, **kwargs)
+                redis_client.set(cache_key, result, ttl)
+                logger.debug(f"Successfully cached result for function {func.__name__} with key: {cache_key}")
+                return result
+            except Exception as e:
+                logger.error(f"Error executing or caching function {func.__name__}: {str(e)}")
+                raise
         
         return cast(Callable[..., T], wrapper)
     return decorator
@@ -94,6 +117,7 @@ def invalidate_cache(pattern: str) -> None:
         pattern: Redis key pattern to match (e.g., "cache:user:*")
     """
     if not redis_client.is_healthy():
+        logger.warning("Redis client is not healthy, skipping cache invalidation")
         return
     
     try:
@@ -101,6 +125,8 @@ def invalidate_cache(pattern: str) -> None:
         keys = redis_client.client.keys(pattern)
         if keys:
             redis_client.client.delete(*keys)
+            logger.info(f"Successfully invalidated {len(keys)} cache entries matching pattern: {pattern}")
+        else:
+            logger.debug(f"No cache entries found matching pattern: {pattern}")
     except Exception as e:
-        # Log error but don't raise
-        print(f"Error invalidating cache: {str(e)}") 
+        logger.error(f"Error invalidating cache entries for pattern {pattern}: {str(e)}") 
