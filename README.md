@@ -194,14 +194,39 @@ The project includes a comprehensive test suite covering various scenarios:
   - Multiple records retrieval
   - Timezone-aware datetime handling
 
+### Integration Tests
+- Database Integration:
+  - Real database connection testing
+  - Transaction handling
+  - Data persistence verification
+  - Schema migration testing
+  - Connection pool management
+
+- Cache Integration:
+  - Redis connection testing
+  - Cache hit/miss scenarios
+  - Cache invalidation
+  - TTL verification
+  - Cache key generation
+
+- API Integration:
+  - End-to-end price fetching flow
+  - Database storage verification
+  - Cache interaction verification
+  - Error propagation
+  - Rate limit handling with real API
+
 ### Database Tests
 - Connection error handling
 - Transaction error handling
+- Migration testing
+- Data integrity verification
 
 ### API Tests
 - Endpoint success scenarios
 - Error handling
 - Input validation
+- Response format verification
 
 ### Running Tests
 
@@ -217,6 +242,26 @@ The test suite uses:
 - pytest-asyncio for async test support
 - pytest-cov for code coverage reporting
 - Mock for mocking external dependencies
+- Docker Compose for isolated test environment
+- PostgreSQL for test database
+- Redis for test cache
+
+### Test Environment
+The test environment is configured with:
+- Isolated PostgreSQL database
+- Isolated Redis instance
+- Automatic database migrations
+- Clean database state between tests
+- Configurable test settings via environment variables
+
+### Test Coverage
+Current test coverage includes:
+- Core business logic
+- Database operations
+- Cache operations
+- API endpoints
+- Error handling
+- Configuration management
 
 ## Error Handling
 
