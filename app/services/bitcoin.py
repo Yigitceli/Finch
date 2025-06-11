@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.cache import cache, invalidate_cache
 from app.models.bitcoin import BitcoinPrice
-from app.schemas.bitcoin import BitcoinPriceCreate
+from app.schemas.bitcoin import BitcoinPriceCreate, BitcoinPriceBase
 
 settings = get_settings()
 
@@ -46,35 +47,51 @@ class BitcoinService:
             
             return price
 
-    @cache(ttl=settings.HISTORICAL_PRICE_CACHE_TTL, key_prefix="bitcoin:historical_prices")
     async def get_historical_prices(
         self,
-        days: int = 7,
-        interval: str = "daily"
-    ) -> List[BitcoinPrice]:
-        """Get historical Bitcoin prices from CoinGecko."""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.base_url}/coins/bitcoin/market_chart",
-                params={
-                    "vs_currency": "usd",
-                    "days": days,
-                    "interval": interval
-                },
-                headers=self.headers
-            )
-            response.raise_for_status()
+        db: AsyncSession,
+        start_time: datetime,
+        end_time: datetime
+    ) -> List[BitcoinPriceBase]:
+        """
+        Get historical Bitcoin prices from database.
+        
+        Args:
+            db: Database session
+            start_time: Start of time range (timezone-aware)
+            end_time: End of time range (timezone-aware)
             
-            prices = []
-            for timestamp, price in response.json()["prices"]:
-                prices.append(
-                    BitcoinPriceCreate(
-                        price_usd=float(price),
-                        timestamp=datetime.fromtimestamp(timestamp / 1000),
-                        source="coingecko"
-                    )
-                )
-            return prices
+        Returns:
+            List of BitcoinPriceBase objects, sorted by timestamp (newest first)
+        """
+        # Convert timezone-aware timestamps to UTC naive timestamps
+        if start_time.tzinfo is not None:
+            start_time = start_time.astimezone(timezone.utc).replace(tzinfo=None)
+        if end_time.tzinfo is not None:
+            end_time = end_time.astimezone(timezone.utc).replace(tzinfo=None)
+        
+        # Query prices within time range
+        query = (
+            select(BitcoinPrice)
+            .where(
+                BitcoinPrice.timestamp >= start_time,
+                BitcoinPrice.timestamp <= end_time
+            )
+            .order_by(BitcoinPrice.timestamp.desc())
+        )
+        
+        result = await db.execute(query)
+        db_prices = list(result.scalars().all())
+        
+        # Convert SQLAlchemy models to Pydantic models
+        return [
+            BitcoinPriceBase(
+                price_usd=price.price_usd,
+                timestamp=price.timestamp,
+                source=price.source
+            )
+            for price in db_prices
+        ]
 
     async def invalidate_price_cache(self) -> None:
         """Invalidate all Bitcoin price related caches."""
