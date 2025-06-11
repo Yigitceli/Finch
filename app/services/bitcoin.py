@@ -129,10 +129,9 @@ class BitcoinService:
             ).order_by(BitcoinPrice.timestamp.desc())
 
             result = await db.execute(query)
-            scalars_result = await result.scalars()
-            prices = await scalars_result.all()
+            prices = result.scalars().all()
 
-            return [BitcoinPriceBase.from_orm(price) for price in prices]
+            return [BitcoinPriceBase.model_validate(price) for price in prices]
         except OperationalError as e:
             raise DatabaseError(
                 status_code=503,

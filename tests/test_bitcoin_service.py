@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, Mock
 from app.services.bitcoin import BitcoinService
 from app.core.exceptions import CoinGeckoRateLimitError, CoinGeckoNetworkError, CoinGeckoInvalidResponseError, CoinGeckoUnknownSymbolError
 from datetime import datetime, timezone
@@ -79,9 +79,9 @@ async def test_get_historical_prices_empty():
     service = BitcoinService()
     mock_db = AsyncMock()
     # Mock DB result: no prices
-    mock_scalars = AsyncMock()
+    mock_scalars = Mock()
     mock_scalars.all.return_value = []
-    mock_result = AsyncMock()
+    mock_result = Mock()
     mock_result.scalars.return_value = mock_scalars
     mock_db.execute.return_value = mock_result
     start = datetime(2025, 1, 1, 0, 0, 0)
@@ -99,9 +99,9 @@ async def test_get_historical_prices_single():
         timestamp=datetime(2025, 1, 1, 12, 0, 0),
         source="coingecko"
     )
-    mock_scalars = AsyncMock()
+    mock_scalars = Mock()
     mock_scalars.all.return_value = [price_obj]
-    mock_result = AsyncMock()
+    mock_result = Mock()
     mock_result.scalars.return_value = mock_scalars
     mock_db.execute.return_value = mock_result
     start = datetime(2025, 1, 1, 0, 0, 0)
@@ -122,9 +122,9 @@ async def test_get_historical_prices_multiple():
         BitcoinPrice(price_usd=150.0, timestamp=datetime(2025, 1, 2, 10, 0, 0), source="coingecko"),
         BitcoinPrice(price_usd=100.0, timestamp=datetime(2025, 1, 2, 8, 0, 0), source="coingecko"),
     ]
-    mock_scalars = AsyncMock()
+    mock_scalars = Mock()
     mock_scalars.all.return_value = price_objs
-    mock_result = AsyncMock()
+    mock_result = Mock()
     mock_result.scalars.return_value = mock_scalars
     mock_db.execute.return_value = mock_result
     start = datetime(2025, 1, 2, 0, 0, 0)
@@ -144,9 +144,9 @@ async def test_get_historical_prices_timezone_aware():
         timestamp=datetime(2025, 1, 1, 15, 0, 0),
         source="coingecko"
     )
-    mock_scalars = AsyncMock()
+    mock_scalars = Mock()
     mock_scalars.all.return_value = [price_obj]
-    mock_result = AsyncMock()
+    mock_result = Mock()
     mock_result.scalars.return_value = mock_scalars
     mock_db.execute.return_value = mock_result
     # Use timezone-aware datetimes
