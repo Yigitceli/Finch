@@ -1,175 +1,181 @@
-# Finch - Bitcoin Price Service
+# Bitcoin Price API
 
-A robust microservice that fetches Bitcoin prices from CoinGecko API, stores them in a PostgreSQL database, and serves client requests through a Redis caching layer.
+A FastAPI-based service that provides Bitcoin price data from CoinGecko API with caching and database storage.
 
-## 🚀 Features
+## Features
 
 - Real-time Bitcoin price fetching from CoinGecko API
-- Efficient caching with Redis
-- Persistent storage with PostgreSQL
-- RESTful API endpoints
-- Docker support
-- Environment-based configuration
-- Comprehensive error handling
-- Rate limiting protection
+- Historical price data storage in PostgreSQL
+- Redis caching for improved performance
+- Rate limiting handling
+- Error handling for network issues and API errors
 - Comprehensive test suite
 
-## 🏗 Architecture
+## Design Decisions
 
-### Technology Stack
+### Why FastAPI?
+- Modern, high-performance web framework for building APIs
+- Built-in async support for better performance
+- Automatic API documentation with OpenAPI/Swagger
+- Type hints and validation with Pydantic
+- Easy to test and maintain
 
-- **Framework**: FastAPI (Python)
-- **Database**: PostgreSQL
-- **Cache**: Redis
-- **Container**: Docker
-- **API**: CoinGecko Public API
+### Database Choice: PostgreSQL
+- **Why Relational over NoSQL:**
+  - Structured data with clear relationships
+  - ACID compliance for data integrity
+  - Strong consistency requirements for financial data
+  - Complex queries and time-based filtering
+  - Mature ecosystem and tooling
 
-### Design Decisions
+- **Schema Design:**
+  ```sql
+  CREATE TABLE bitcoin_prices (
+      id SERIAL PRIMARY KEY,
+      price_usd DECIMAL NOT NULL,
+      timestamp TIMESTAMP NOT NULL,
+      source VARCHAR(50) NOT NULL
+  );
+  ```
+  - `price_usd`: Decimal for precise price storage
+  - `timestamp`: For time-series analysis
+  - `source`: Track data origin
+  - Indexes on timestamp for efficient range queries
 
-1. **Database Choice (PostgreSQL)**
-   - Relational database chosen for:
-     - Strong data consistency
-     - ACID compliance
-     - Efficient time-series data querying
-     - Built-in timestamp handling
-     - Mature ecosystem and tooling
-   - Schema designed for:
-     - Efficient price history queries
-     - Easy data aggregation
-     - Future extensibility
+### Caching Strategy
+- **Redis as Cache Layer:**
+  - In-memory performance
+  - Built-in TTL support
+  - Atomic operations
+  - Pub/Sub for cache invalidation
 
-2. **Caching Strategy**
-   - Redis chosen for:
-     - In-memory performance
-     - Built-in TTL support
-     - Atomic operations
-     - Pub/Sub capabilities (for future scaling)
-   - Cache TTLs:
-     - Current price: 5 minutes
-   - Cache invalidation on new price updates
+- **TTL Configuration:**
+  - Current price: 1 minute (frequent updates)
+  - Historical prices: 5 minutes (less frequent changes)
+  - Configurable via environment variables
 
-3. **API Design**
-   - RESTful principles
-   - Clear error responses
-   - Rate limiting protection
-   - Proper HTTP status codes
-   - Consistent response format
+### Error Handling Strategy
+- Custom exception hierarchy
+- Consistent error response format
+- Proper HTTP status codes
+- Detailed error messages
+- Rate limit handling with Retry-After
 
-## 🛠 Setup
+## API Documentation
 
-### Prerequisites
+### Current Price Endpoint
+```http
+GET /api/v1/bitcoin/current-price
+```
 
-- Docker
-- Docker Compose
-- Python 3.9+ (for local development)
+**Response:**
+```json
+{
+    "price_usd": 50000.00,
+    "timestamp": "2024-02-20T12:00:00Z",
+    "source": "coingecko"
+}
+```
 
-### Environment Variables
+**Error Responses:**
+```json
+{
+    "detail": "Rate limit exceeded. Try again in 60 seconds."
+}
+```
+```json
+{
+    "detail": "Network error: Connection refused"
+}
+```
 
-Create a `.env` file in the root directory:
+### Historical Prices Endpoint
+```http
+GET /api/v1/bitcoin/historical-prices?start_time=2024-02-19T00:00:00Z&end_time=2024-02-20T00:00:00Z
+```
 
+**Response:**
+```json
+[
+    {
+        "price_usd": 50000.00,
+        "timestamp": "2024-02-19T23:00:00Z",
+        "source": "coingecko"
+    },
+    {
+        "price_usd": 49900.00,
+        "timestamp": "2024-02-19T22:00:00Z",
+        "source": "coingecko"
+    }
+]
+```
+
+**Error Responses:**
+```json
+{
+    "detail": "Invalid date format. Use ISO 8601 format."
+}
+```
+```json
+{
+    "detail": "Database error: Connection refused"
+}
+```
+
+## Environment Configuration
+
+### Required Environment Variables
 ```env
 # Database
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
+POSTGRES_USER=your_user
+POSTGRES_PASSWORD=your_password
 POSTGRES_DB=bitcoin_prices
-POSTGRES_HOST=db
+POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
+DATABASE_URL=database_url
 
 # Redis
 REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_DB=0
-REDIS_PASSWORD=
 
 # API
 COINGECKO_API_URL=https://api.coingecko.com/api/v3
-CURRENT_PRICE_CACHE_TTL=300
+
+# Cache TTL (in seconds)
+CURRENT_PRICE_CACHE_TTL=60
+
+# API Settings
+API_RATE_LIMIT=50
 ```
 
-### Running with Docker
+### Environment-specific Configurations
+- Development: Local development settings
+- Test: Test environment with mock services
+- Production: Production-ready configuration
 
-1. Build and start the containers:
+## Prerequisites
+
+- Docker and Docker Compose
+- Python 3.9+
+- PostgreSQL
+- Redis
+
+## Installation
+
+1. Clone the repository:
 ```bash
-docker-compose up -d
+git clone <repository-url>
+cd <repository-name>
 ```
 
-2. The service will be available at:
-   - API: http://localhost:8000
-   - API Documentation: http://localhost:8000/docs
-   - PgAdmin: http://localhost:5050
+2. Create a `.env` file in the project root with the required variables
 
-### Local Development
-
-1. Create a virtual environment:
+3. Build and start the services:
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+cd docker
+docker-compose up --build
 ```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-3. Run the application:
-```bash
-uvicorn app.main:app --reload
-```
-
-## 📚 API Documentation
-
-### Endpoints
-
-#### 1. Get Current Bitcoin Price
-```http
-GET /api/v1/bitcoin/current-price
-```
-
-Response:
-```json
-{
-    "price_usd": 50000.0,
-    "timestamp": "2024-03-19T14:30:00Z",
-    "source": "coingecko"
-}
-```
-
-#### 2. Get Bitcoin Price History
-```http
-GET /api/v1/bitcoin/price-history?start_time={start_time}&end_time={end_time}
-```
-
-Parameters:
-- `start_time`: ISO 8601 timestamp (UTC)
-- `end_time`: ISO 8601 timestamp (UTC)
-
-Response:
-```json
-{
-    "prices": [
-        {
-            "price_usd": 50000.0,
-            "timestamp": "2024-03-19T14:30:00Z",
-            "source": "coingecko"
-        }
-    ]
-}
-```
-
-### Error Responses
-
-```json
-{
-    "detail": "Error message"
-}
-```
-
-Common HTTP Status Codes:
-- 200: Success
-- 400: Bad Request
-- 404: Not Found
-- 429: Too Many Requests
-- 500: Internal Server Error
 
 ## Testing
 
