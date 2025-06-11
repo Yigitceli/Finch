@@ -15,7 +15,7 @@ async def get_price(db: AsyncSession = Depends(get_db)):
         BitcoinPriceResponse: Current Bitcoin price in USD
     """
     try:
-        price = await bitcoin_service.get_current_price()
+        price = await bitcoin_service.get_current_price(db)
         return BitcoinPriceResponse(price=price)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) 
