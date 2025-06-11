@@ -147,6 +147,11 @@ CURRENT_PRICE_CACHE_TTL=60
 
 # API Settings
 API_RATE_LIMIT=50
+
+# PGADMIN
+PGADMIN_EMAIL=admin@admin.com
+PGADMIN_PASSWORD=admin
+PGADMIN_PORT=5050
 ```
 
 ### Environment-specific Configurations
