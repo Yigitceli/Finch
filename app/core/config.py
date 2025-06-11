@@ -14,7 +14,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     # Redis settings
+    REDIS_HOST: str = "redis"  # Default value for Docker Compose
     REDIS_PORT: int
+    REDIS_DB: int = 0  # Default Redis database number
+    REDIS_PASSWORD: str = ""  # Default empty password
     REDIS_URL: str
 
     # Cache settings
