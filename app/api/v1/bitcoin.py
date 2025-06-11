@@ -11,8 +11,10 @@ from app.core.exceptions import (
     CoinGeckoInvalidResponseError,
     CoinGeckoUnknownSymbolError
 )
+from app.core.logging import setup_logging
 
 router = APIRouter()
+logger = setup_logging("bitcoin_api")
 
 @router.get("/current-price", response_model=BitcoinPriceResponse)
 async def get_price(db: AsyncSession = Depends(get_db)):
@@ -26,12 +28,16 @@ async def get_price(db: AsyncSession = Depends(get_db)):
         HTTPException: Various HTTP errors based on CoinGecko API response
     """
     try:
+        logger.info("Fetching current Bitcoin price")
         price = await bitcoin_service.get_current_price(db)
+        logger.info(f"Successfully fetched Bitcoin price: ${price:,.2f}")
         return BitcoinPriceResponse(price=price)
     except CoinGeckoError as e:
+        logger.error(f"CoinGecko API error: {str(e)}")
         # Re-raise CoinGecko errors as they are already HTTPExceptions
         raise e
     except Exception as e:
+        logger.error(f"Unexpected error while fetching Bitcoin price: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
@@ -57,16 +63,22 @@ async def get_price_history(
         HTTPException: Various HTTP errors based on input validation or database errors
     """
     try:
+        logger.info(f"Fetching Bitcoin price history from {start_time} to {end_time}")
+        
         if end_time < start_time:
+            logger.warning(f"Invalid time range: end_time ({end_time}) is before start_time ({start_time})")
             raise HTTPException(
                 status_code=400,
                 detail="End time must be after start time"
             )
+            
         prices = await bitcoin_service.get_historical_prices(db, start_time, end_time)
+        logger.info(f"Successfully fetched {len(prices)} historical Bitcoin prices")
         return BitcoinPriceHistoryResponse(prices=prices)
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Unexpected error while fetching Bitcoin price history: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
