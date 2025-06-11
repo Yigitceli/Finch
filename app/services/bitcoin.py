@@ -3,6 +3,7 @@ from typing import Optional, List
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from app.core.config import get_settings
 from app.core.cache import cache, invalidate_cache
 from app.models.bitcoin import BitcoinPrice
@@ -11,7 +12,8 @@ from app.core.exceptions import (
     CoinGeckoRateLimitError,
     CoinGeckoNetworkError,
     CoinGeckoInvalidResponseError,
-    CoinGeckoUnknownSymbolError
+    CoinGeckoUnknownSymbolError,
+    DatabaseError
 )
 
 settings = get_settings()
@@ -36,6 +38,7 @@ class BitcoinService:
             CoinGeckoNetworkError: When there are network issues
             CoinGeckoInvalidResponseError: When API response is invalid
             CoinGeckoUnknownSymbolError: When cryptocurrency symbol is unknown
+            DatabaseError: When database operation fails
         """
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -66,14 +69,21 @@ class BitcoinService:
                     raise CoinGeckoInvalidResponseError(f"Invalid response format: {str(e)}")
                 
                 # Save to database
-                bitcoin_price = BitcoinPrice(
-                    price_usd=price,
-                    timestamp=datetime.utcnow(),
-                    source="coingecko"
-                )
-                db.add(bitcoin_price)
-                await db.commit()
-                await db.refresh(bitcoin_price)
+                try:
+                    bitcoin_price = BitcoinPrice(
+                        price_usd=price,
+                        timestamp=datetime.utcnow(),
+                        source="coingecko"
+                    )
+                    db.add(bitcoin_price)
+                    await db.commit()
+                    await db.refresh(bitcoin_price)
+                except SQLAlchemyError as e:
+                    await db.rollback()
+                    raise DatabaseError(
+                        status_code=500,
+                        detail=f"Database transaction failed: {str(e)}"
+                    )
                 
                 return price
                 
@@ -85,6 +95,10 @@ class BitcoinService:
             if e.response.status_code == 404:
                 raise CoinGeckoUnknownSymbolError("bitcoin")
             raise CoinGeckoNetworkError(f"HTTP error: {str(e)}")
+        except Exception as e:
+            if isinstance(e, (CoinGeckoRateLimitError, CoinGeckoUnknownSymbolError, CoinGeckoInvalidResponseError, DatabaseError)):
+                raise
+            raise CoinGeckoNetworkError(f"Unexpected error: {str(e)}")
 
     async def get_historical_prices(
         self,
@@ -103,34 +117,32 @@ class BitcoinService:
         Returns:
             List of BitcoinPriceBase objects, sorted by timestamp (newest first)
         """
-        # Convert timezone-aware timestamps to UTC naive timestamps
-        if start_time.tzinfo is not None:
-            start_time = start_time.astimezone(timezone.utc).replace(tzinfo=None)
-        if end_time.tzinfo is not None:
-            end_time = end_time.astimezone(timezone.utc).replace(tzinfo=None)
-        
-        # Query prices within time range
-        query = (
-            select(BitcoinPrice)
-            .where(
-                BitcoinPrice.timestamp >= start_time,
-                BitcoinPrice.timestamp <= end_time
+        try:
+            # Convert timezone-aware timestamps to UTC naive timestamps
+            if start_time.tzinfo is not None:
+                start_time = start_time.astimezone(timezone.utc).replace(tzinfo=None)
+            if end_time.tzinfo is not None:
+                end_time = end_time.astimezone(timezone.utc).replace(tzinfo=None)
+
+            query = select(BitcoinPrice).where(
+                BitcoinPrice.timestamp.between(start_time, end_time)
+            ).order_by(BitcoinPrice.timestamp.desc())
+
+            result = await db.execute(query)
+            scalars_result = await result.scalars()
+            prices = await scalars_result.all()
+
+            return [BitcoinPriceBase.from_orm(price) for price in prices]
+        except OperationalError as e:
+            raise DatabaseError(
+                status_code=503,
+                detail=f"Database connection failed: {str(e)}"
             )
-            .order_by(BitcoinPrice.timestamp.desc())
-        )
-        
-        result = await db.execute(query)
-        db_prices = list(result.scalars().all())
-        
-        # Convert SQLAlchemy models to Pydantic models
-        return [
-            BitcoinPriceBase(
-                price_usd=price.price_usd,
-                timestamp=price.timestamp,
-                source=price.source
+        except SQLAlchemyError as e:
+            raise DatabaseError(
+                status_code=500,
+                detail=f"Database error: {str(e)}"
             )
-            for price in db_prices
-        ]
 
     async def invalidate_price_cache(self) -> None:
         """Invalidate all Bitcoin price related caches."""

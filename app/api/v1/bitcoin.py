@@ -62,15 +62,10 @@ async def get_price_history(
                 status_code=400,
                 detail="End time must be after start time"
             )
-        
-        if (end_time - start_time).total_seconds() > 90 * 24 * 3600:  # 90 days
-            raise HTTPException(
-                status_code=400,
-                detail="Time range cannot exceed 90 days"
-            )
-        
         prices = await bitcoin_service.get_historical_prices(db, start_time, end_time)
         return BitcoinPriceHistoryResponse(prices=prices)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,

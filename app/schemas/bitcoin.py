@@ -8,6 +8,10 @@ class BitcoinPriceBase(BaseModel):
     timestamp: datetime = Field(..., description="Timestamp of the price")
     source: str = Field(..., description="Source of the price data")
 
+    model_config = {
+        "from_attributes": True
+    }
+
 class BitcoinPriceCreate(BitcoinPriceBase):
     """Model for creating a new Bitcoin price record."""
     pass

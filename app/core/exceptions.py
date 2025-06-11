@@ -43,4 +43,13 @@ class CoinGeckoUnknownSymbolError(CoinGeckoError):
         super().__init__(
             status_code=404,
             detail=f"Unknown cryptocurrency symbol: {symbol}"
-        ) 
+        )
+
+class DatabaseError(HTTPException):
+    """Base exception for database errors."""
+    def __init__(
+        self,
+        status_code: int,
+        detail: str
+    ):
+        super().__init__(status_code=status_code, detail=detail) 

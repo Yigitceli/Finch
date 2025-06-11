@@ -12,6 +12,7 @@ A robust microservice that fetches Bitcoin prices from CoinGecko API, stores the
 - Environment-based configuration
 - Comprehensive error handling
 - Rate limiting protection
+- Comprehensive test suite
 
 ## 🏗 Architecture
 
@@ -169,3 +170,54 @@ Common HTTP Status Codes:
 - 404: Not Found
 - 429: Too Many Requests
 - 500: Internal Server Error
+
+## Testing
+
+The project includes a comprehensive test suite covering various scenarios:
+
+### Unit Tests
+- Current Price Tests:
+  - Successful price fetching
+  - Rate limit handling
+  - Network error handling
+  - Invalid response handling
+
+- Historical Prices Tests:
+  - Empty result handling
+  - Single record retrieval
+  - Multiple records retrieval
+  - Timezone-aware datetime handling
+
+### Database Tests
+- Connection error handling
+- Transaction error handling
+
+### API Tests
+- Endpoint success scenarios
+- Error handling
+- Input validation
+
+### Running Tests
+
+To run the test suite:
+
+```bash
+cd docker
+docker-compose -f docker-compose.test.yml up --build
+```
+
+The test suite uses:
+- pytest for test execution
+- pytest-asyncio for async test support
+- pytest-cov for code coverage reporting
+- Mock for mocking external dependencies
+
+## Error Handling
+
+The API handles various error scenarios:
+
+- `CoinGeckoRateLimitError`: When API rate limit is exceeded
+- `CoinGeckoNetworkError`: When there are network issues
+- `CoinGeckoInvalidResponseError`: When API response is invalid
+- `CoinGeckoUnknownSymbolError`: When cryptocurrency symbol is unknown
+- `DatabaseError`: When database operations fail
