@@ -5,6 +5,7 @@ import time
 from app.api import api_router
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.middleware.rate_limit import RateLimitMiddleware
 
 settings = get_settings()
 logger = setup_logging("app")
@@ -23,6 +24,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add rate limiting middleware
+app.add_middleware(RateLimitMiddleware)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
