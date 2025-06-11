@@ -5,7 +5,7 @@ from app.core.redis import redis_client
 from app.db.session import get_db
 from app.schemas.health import HealthResponse, ServiceHealth
 
-router = APIRouter(prefix="/health", tags=["health"])
+router = APIRouter(tags=["health"])
 
 @router.get("", response_model=HealthResponse)
 async def health_check(db: AsyncSession = Depends(get_db)) -> HealthResponse:
