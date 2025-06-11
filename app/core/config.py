@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -7,28 +8,29 @@ class Settings(BaseSettings):
     Application settings
     """
     # Database settings
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
-    POSTGRES_PORT: int
-    DATABASE_URL: str
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "bitcoin_prices"
+    POSTGRES_PORT: int = 5432
+    DATABASE_URL: str = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@db:{POSTGRES_PORT}/{POSTGRES_DB}"
 
     # Redis settings
-    REDIS_HOST: str = "redis"  # Default value for Docker Compose
-    REDIS_PORT: int
-    REDIS_DB: int = 0  # Default Redis database number
-    REDIS_PASSWORD: str = ""  # Default empty password
-    REDIS_URL: str
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_URL: str = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
     # Cache settings
-    CACHE_TTL: int
+    CURRENT_PRICE_CACHE_TTL: int = 300  # 5 minutes
+    HISTORICAL_PRICE_CACHE_TTL: int = 3600  # 1 hour
 
     # API settings
-    COINGECKO_API_URL: str
+    COINGECKO_API_URL: str = "https://api.coingecko.com/api/v3"
     API_RATE_LIMIT: int
 
     # Application settings
-    DEBUG: bool
+    DEBUG: bool = True
     ENVIRONMENT: str
     APP_PORT: int
 

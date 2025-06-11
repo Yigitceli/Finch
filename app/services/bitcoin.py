@@ -10,13 +10,15 @@ settings = get_settings()
 
 class BitcoinService:
     def __init__(self):
-        self.base_url = "https://api.coingecko.com/api/v3"
+        self.base_url = settings.COINGECKO_API_URL
         self.headers = {
             "Accept": "application/json",
             "User-Agent": "Finch/1.0"
         }
+        self.current_price_ttl = settings.CURRENT_PRICE_CACHE_TTL
+        self.historical_price_ttl = settings.HISTORICAL_PRICE_CACHE_TTL
 
-    @cache(ttl=300, key_prefix="btc_price")  # Cache for 5 minutes
+    @cache(ttl=settings.CURRENT_PRICE_CACHE_TTL, key_prefix="bitcoin:current_price")
     async def get_current_price(self) -> float:
         """Get current Bitcoin price from CoinGecko."""
         async with httpx.AsyncClient() as client:
@@ -31,7 +33,7 @@ class BitcoinService:
             response.raise_for_status()
             return float(response.json()["bitcoin"]["usd"])
 
-    @cache(ttl=3600, key_prefix="btc_historical")  # Cache for 1 hour
+    @cache(ttl=settings.HISTORICAL_PRICE_CACHE_TTL, key_prefix="bitcoin:historical_prices")
     async def get_historical_prices(
         self,
         days: int = 7,
@@ -63,8 +65,8 @@ class BitcoinService:
 
     async def invalidate_price_cache(self) -> None:
         """Invalidate all Bitcoin price related caches."""
-        invalidate_cache("btc_price:*")
-        invalidate_cache("btc_historical:*")
+        invalidate_cache("bitcoin:current_price:*")
+        invalidate_cache("bitcoin:historical_prices:*")
 
 # Create a singleton instance
 bitcoin_service = BitcoinService() 
