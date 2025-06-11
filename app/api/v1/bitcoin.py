@@ -4,6 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.schemas.bitcoin import BitcoinPriceResponse, BitcoinPriceHistoryResponse
 from app.services.bitcoin import bitcoin_service
+from app.core.exceptions import (
+    CoinGeckoError,
+    CoinGeckoRateLimitError,
+    CoinGeckoNetworkError,
+    CoinGeckoInvalidResponseError,
+    CoinGeckoUnknownSymbolError
+)
 
 router = APIRouter()
 
@@ -14,12 +21,21 @@ async def get_price(db: AsyncSession = Depends(get_db)):
     
     Returns:
         BitcoinPriceResponse: Current Bitcoin price in USD
+        
+    Raises:
+        HTTPException: Various HTTP errors based on CoinGecko API response
     """
     try:
         price = await bitcoin_service.get_current_price(db)
         return BitcoinPriceResponse(price=price)
+    except CoinGeckoError as e:
+        # Re-raise CoinGecko errors as they are already HTTPExceptions
+        raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 @router.get("/price-history", response_model=BitcoinPriceHistoryResponse)
 async def get_price_history(
@@ -36,15 +52,27 @@ async def get_price_history(
         
     Returns:
         BitcoinPriceHistoryResponse: List of Bitcoin prices with timestamps
+        
+    Raises:
+        HTTPException: Various HTTP errors based on input validation or database errors
     """
     try:
         if end_time < start_time:
-            raise HTTPException(status_code=400, detail="End time must be after start time")
+            raise HTTPException(
+                status_code=400,
+                detail="End time must be after start time"
+            )
         
         if (end_time - start_time).total_seconds() > 90 * 24 * 3600:  # 90 days
-            raise HTTPException(status_code=400, detail="Time range cannot exceed 90 days")
+            raise HTTPException(
+                status_code=400,
+                detail="Time range cannot exceed 90 days"
+            )
         
         prices = await bitcoin_service.get_historical_prices(db, start_time, end_time)
         return BitcoinPriceHistoryResponse(prices=prices)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        ) 
