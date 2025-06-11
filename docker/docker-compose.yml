@@ -84,6 +84,24 @@ services:
       - finch-network
     restart: unless-stopped
 
+  alembic:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: finch-alembic
+    volumes:
+      - ..:/app
+    env_file:
+      - ../.env
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    command: alembic upgrade head
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - finch-network
+
 volumes:
   postgres_data:
     name: finch-postgres-data
