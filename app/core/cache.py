@@ -23,6 +23,18 @@ def generate_cache_key(func: Callable, *args: Any, **kwargs: Any) -> str:
     key_string = ":".join(key_parts)
     return f"cache:{hashlib.md5(key_string.encode()).hexdigest()}"
 
+async def get_cache(key: str) -> Optional[str]:
+    """Get value from cache."""
+    if not redis_client.is_healthy():
+        return None
+    return redis_client.get(key)
+
+async def set_cache(key: str, value: str, ttl: Optional[int] = None) -> None:
+    """Set value in cache with optional TTL."""
+    if not redis_client.is_healthy():
+        return
+    redis_client.set(key, value, ttl)
+
 def cache(
     ttl: Optional[int] = 3600,  # Default 1 hour
     key_prefix: Optional[str] = None,
