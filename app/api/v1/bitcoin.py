@@ -6,10 +6,13 @@ from app.services.bitcoin import bitcoin_service
 
 router = APIRouter()
 
-@router.get("/price", response_model=BitcoinPriceResponse)
+@router.get("/current-price", response_model=BitcoinPriceResponse)
 async def get_price(db: AsyncSession = Depends(get_db)):
     """
-    Get current Bitcoin price
+    Get current Bitcoin price.
+    
+    Returns:
+        BitcoinPriceResponse: Current Bitcoin price in USD
     """
     try:
         price = await bitcoin_service.get_current_price()
