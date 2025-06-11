@@ -36,15 +36,13 @@ def upgrade() -> None:
         'ix_bitcoin_prices_id',
         'bitcoin_prices',
         ['id'],
-        unique=False,
-        postgresql_ops={'id': 'btree'}
+        unique=False
     )
     op.create_index(
         'ix_bitcoin_prices_timestamp',
         'bitcoin_prices',
         ['timestamp'],
-        unique=False,
-        postgresql_ops={'timestamp': 'btree'}
+        unique=False
     )
 
     # Add comment to table
